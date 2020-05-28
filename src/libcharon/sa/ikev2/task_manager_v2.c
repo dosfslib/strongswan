@@ -174,6 +174,11 @@ struct private_task_manager_t {
 	 * Use make-before-break instead of break-before-make reauth?
 	 */
 	bool make_before_break;
+	
+	/**
+	 * set when a retransmit is sent
+	 */
+	bool retransmit_sent;
 };
 
 /**
@@ -387,6 +392,7 @@ METHOD(task_manager_t, retransmit, status_t,
 					 this->initiating.retransmitted, message_id);
 				charon->bus->alert(charon->bus, ALERT_RETRANSMIT_SEND, packet,
 								   this->initiating.retransmitted);
+				this->retransmit_sent = TRUE;
 			}
 			if (!mobike)
 			{
@@ -730,8 +736,9 @@ static status_t process_response(private_task_manager_t *this,
 	}
 	enumerator->destroy(enumerator);
 
-	if (this->initiating.retransmitted > 1)
+	if (this->initiating.retransmitted > 1 || this->retransmit_sent)
 	{
+		this->retransmit_sent = FALSE;
 		packet_t *packet = NULL;
 		array_get(this->initiating.packets, 0, &packet);
 		charon->bus->alert(charon->bus, ALERT_RETRANSMIT_SEND_CLEARED, packet);
@@ -2296,6 +2303,7 @@ task_manager_v2_t *task_manager_v2_create(ike_sa_t *ike_sa)
 					"%s.retransmit_limit", 0, lib->ns) * 1000,
 		.make_before_break = lib->settings->get_bool(lib->settings,
 					"%s.make_before_break", FALSE, lib->ns),
+	     	.retransmit_sent = FALSE,
 	);
 
 	return &this->public;
